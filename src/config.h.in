@@ -1,0 +1,21 @@
+//
+// Created by zach on 2023-04-29.
+//
+
+#ifndef GATHERSUN_CONFIG_H
+#define GATHERSUN_CONFIG_H
+
+namespace gathersun {
+
+    namespace config {
+
+        inline constexpr const char* APPLICATION_NAME = "@APPLICATION_NAME@";
+        inline constexpr const char* APPLICATION_SLUG = "@APPLICATION_SLUG@";
+        inline constexpr int APPLICATION_VERSION_MAJOR = @APPLICATION_VERSION_MAJOR@;
+        inline constexpr int APPLICATION_VERSION_MINOR = @APPLICATION_VERSION_MINOR@;
+        inline constexpr int APPLICATION_VERSION_PATCH = @APPLICATION_VERSION_PATCH@;
+        inline constexpr const char* APPLICATION_VERSION = "@APPLICATION_VERSION@";
+    }
+}
+
+#endif // GATHERSUN_CONFIG_H

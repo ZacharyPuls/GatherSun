@@ -1,0 +1,1 @@
+{"atlas":{"width":256,"height":256,"yOrigin":"bottom"},"objectTypes":[{"name":"button","planeBounds":{"left":0.0,"bottom":0.0,"right":320.0,"top":128.0},"atlasBounds":{"inactive":{"left":0.0,"bottom":0.0,"right":48.0,"top":16.0},"active":{"left":48.0,"bottom":0.0,"right":96.0,"top":16.0}}}]}
