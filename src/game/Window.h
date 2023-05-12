@@ -14,7 +14,7 @@ namespace gathersun::game {
     public:
         explicit Window(std::string title, int width, int height, bool fullscreen);
 
-        ~Window();
+        ~Window() = default;
 
         glm::ivec2 GetSize() const;
 
@@ -27,6 +27,8 @@ namespace gathersun::game {
         bool IsMouseButtonPressed(int button) const;
 
         bool IsActive() const;
+
+        void Destroy();
 
     private:
         std::string title_;

@@ -16,7 +16,7 @@ namespace gathersun::system {
     // TODO: log spurious/incorrect events that cannot be handled.
     class EventSystem : public System {
     public:
-        explicit EventSystem(entt::registry &registry);
+        EventSystem(scene::Scene *scene, game::Window *window, game::GameState *gameState);
 
         void Run(double dt) override;
 
@@ -39,7 +39,7 @@ namespace gathersun::system {
 
         void playerMovementEventListener_(event::PlayerMovementEvent);
 
-        static entt::entity getActiveMenu_(entt::registry &registry);
+        entt::entity getActiveMenu_();
     };
 }
 

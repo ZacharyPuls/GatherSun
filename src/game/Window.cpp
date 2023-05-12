@@ -65,12 +65,6 @@ namespace gathersun::game {
         glfwSetWindowUserPointer(handle_, this);
     }
 
-    Window::~Window() {
-        glfwDestroyWindow(handle_);
-        // TODO: either break GLFW init/deinit out into its own class, or refcount Window and only glfwTerminate when all references have been released
-        glfwTerminate();
-    }
-
     glm::ivec2 Window::GetSize() const {
         int width, height = 0;
         glfwGetFramebufferSize(handle_, &width, &height);
@@ -140,5 +134,11 @@ namespace gathersun::game {
     void Window::closeCallback_(GLFWwindow *) {
         // TODO: Send event::WindowCloseEvent, which processes by destroying the Window and triggering an event::ExitEvent
         event::EventManager::Instance().TriggerEvent<event::ExitEvent>({});
+    }
+
+    void Window::Destroy() {
+        glfwDestroyWindow(handle_);
+        // TODO: either break GLFW init/deinit out into its own class, or refcount Window and only glfwTerminate when all references have been released
+        glfwTerminate();
     }
 }

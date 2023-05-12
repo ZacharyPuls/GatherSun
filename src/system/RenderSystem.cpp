@@ -5,35 +5,41 @@
 #include "RenderSystem.h"
 #include "entity/Component.h"
 #include "ui/Menu.h"
-#include "event/EventManager.h"
-#include "entity/Entity.h"
-#include "entity/Player.h"
+#include "ui/Button.h"
+#include "ui/Text.h"
 #include "render/Shader.h"
+#include "render/Renderable.h"
 
 #include <iostream>
 
 namespace gathersun::system {
 
-    RenderSystem::RenderSystem(entt::registry &registry) : System(registry), defaultShader_("res/shader/default.glsl"),
-                                                           textShader_("res/shader/text.glsl"),
-                                                           vbo_(GL_ARRAY_BUFFER, GL_DYNAMIC_DRAW),
-                                                           uiTexture_("res/menu/ui-elements.bmp", true) {
+    RenderSystem::RenderSystem(scene::Scene *scene, game::Window *window, game::GameState *gameState) : System(scene,
+                                                                                                               window,
+                                                                                                               gameState),
+                                                                                                        defaultShader_(
+                                                                                                                "res/shader/default.glsl"),
+                                                                                                        textShader_(
+                                                                                                                "res/shader/text.glsl"),
+                                                                                                        vbo_(GL_ARRAY_BUFFER,
+                                                                                                             GL_DYNAMIC_DRAW) {
         glEnable(GL_MULTISAMPLE);
-        scene_.SetCamera(scene::Camera{});
-//        scene_.GetCamera().SetPosition(glm::vec3(0.0f));
-        auto playerSprite = Sprite{"res/sprite/test-spritesheet.png", "res/sprite/test-spritesheet.json"};
-        auto playerEntity = entity::Player(playerSprite, glm::vec2(100.0f, 100.0f));
-        scene_.AddPlayer(registry_, playerEntity);
+        auto camera = scene_->AddObject("Camera");
+        camera.AddComponent<scene::Camera>();
+
+//        auto playerSprite = Sprite{"res/sprite/test-spritesheet.png", "res/sprite/test-spritesheet.json"};
+//        auto playerEntity = entity::Player(playerSprite, glm::vec2(100.0f, 100.0f));
+//        scene_.AddPlayer(registry_, playerEntity);
     }
 
     void RenderSystem::Run(double dt) {
-        registry_.view<ui::RenderableTextComponent, entity::TransformComponent, entity::RotatingEffectComponent>().each(
+        scene_->View<ui::RenderableTextComponent, entity::TransformComponent, entity::RotatingEffectComponent>().each(
                 [dt](auto &text, auto &transform, auto &rotatingEffect) {
                     transform.Rotation = glm::rotate(transform.Rotation, rotatingEffect.Speed * static_cast<float>(dt),
                                                      rotatingEffect.Axis);
                 });
 
-        registry_.view<ui::RenderableTextComponent, entity::ColorShiftEffectComponent>().each(
+        scene_->View<ui::RenderableTextComponent, entity::ColorShiftEffectComponent>().each(
                 [dt](auto &text, auto &colorShiftEffect) {
                     text.Color = glm::mix(colorShiftEffect.StartColor, colorShiftEffect.EndColor,
                                           colorShiftEffect.Progress);
@@ -46,22 +52,21 @@ namespace gathersun::system {
                     }
                 });
 
-        auto window = registry_.ctx().get<std::shared_ptr<game::Window>>();
-        startFrame_(window);
+        startFrame_();
 
         vao_.Bind();
         vbo_.Bind();
         // TODO: actually size this properly
         vbo_.SetData(sizeof(float) * 6 * 4 * 256, nullptr);
 
-        auto width = window->GetSize().x;
-        auto height = window->GetSize().y;
+        auto width = window_->GetSize().x;
+        auto height = window_->GetSize().y;
 
-        auto &camera = scene_.GetCamera();
+        auto camera = scene_->GetObject("Camera").GetComponent<scene::Camera>();
         camera.OrthographicProjection(0.0f, static_cast<float>(width), 0.0f, static_cast<float>(height), -1.0f, 1.0f);
         const auto projection = camera.GetProjectionMatrix();
 
-        auto menuView = registry_.view<std::shared_ptr<ui::Menu>>();
+        auto menuView = scene_->View<ui::Menu>();
         // TODO: do we really want to do one draw call per type (menu element, text, etc)?
 
         glEnable(GL_BLEND);
@@ -73,25 +78,26 @@ namespace gathersun::system {
         {
             defaultShader_.Bind();
             auto triangleCount = 0;
-            for (const auto &entityId: scene_.GetEntities()) {
-                auto &entity = registry_.get<entity::Entity>(entityId);
-                const auto transform = entity::TransformComponent{glm::vec3(entity.GetPosition(), 0.0f), {},
-                                                          glm::vec3(1.0f)};
+            /*auto renderableObjects = scene_->View<render::Position, render::Renderable>();
+            for (auto object: renderableObjects) {
+                auto position = renderableObjects.get<render::Position>(object);
+                auto renderable = renderableObjects.get<render::Renderable>(object);
+                auto texture = renderable.Texture;
+                const auto transform = entity::TransformComponent{glm::vec3(position.Position, 0.0f), {},
+                                                                  glm::vec3(1.0f)};
                 defaultShader_.UniformMat4(0, projection * transform.GetModelMatrix());
-                entity.GetSprite().GetTexture().Bind();
+                texture->Bind();
                 defaultShader_.UniformTexture(1, 0);
 
-                auto spriteSize = entity.GetSprite().GetSize();
-                float left = spriteSize.x;
-                float bottom = spriteSize.y;
-                float right = spriteSize.z;
-                float top = spriteSize.w;
+                float left = renderable.Bounds.x;
+                float bottom = renderable.Bounds.y;
+                float right = renderable.Bounds.z;
+                float top = renderable.Bounds.w;
 
-                auto spriteTexcoords = entity.GetSprite().GetTexcoords();
-                float textureLeft = spriteTexcoords.x;
-                float textureBottom = spriteTexcoords.y;
-                float textureRight = spriteTexcoords.z;
-                float textureTop = spriteTexcoords.w;
+                float textureLeft = renderable.Texcoords.x;
+                float textureBottom = renderable.Texcoords.y;
+                float textureRight = renderable.Texcoords.z;
+                float textureTop = renderable.Texcoords.w;
 
                 float vertices[6][4] = {{left,  top,    textureLeft,  textureTop},
                                         {left,  bottom, textureLeft,  textureBottom},
@@ -102,25 +108,25 @@ namespace gathersun::system {
 
                 vbo_.SetSubData(sizeof(float) * 4 * 3 * triangleCount, sizeof(vertices), vertices);
                 triangleCount += 2;
-            }
-            auto &entity = registry_.ctx().get<entity::Player>();
-            const auto transform = entity::TransformComponent{glm::vec3(entity.GetPosition(), 0.0f), {},
-                                                      glm::vec3(1.0f)};
+            }*/
+
+            auto &playerPosition = scene_->GetObject("Player").GetComponent<render::Position>();
+            auto &playerRenderable = scene_->GetObject("Player").GetComponent<render::Renderable>();
+            const auto transform = entity::TransformComponent{glm::vec3(playerPosition.Position, 0.0f), {},
+                                                              glm::vec3(1.0f)};
             defaultShader_.UniformMat4(0, projection * transform.GetModelMatrix());
-            entity.GetSprite().GetTexture().Bind();
+            playerRenderable.Texture->Bind();
             defaultShader_.UniformTexture(1, 0);
 
-            auto spriteSize = entity.GetSprite().GetSize();
-            float left = spriteSize.x;
-            float bottom = spriteSize.y;
-            float right = spriteSize.z;
-            float top = spriteSize.w;
+            float left = playerRenderable.Bounds.x;
+            float bottom = playerRenderable.Bounds.y;
+            float right = playerRenderable.Bounds.z;
+            float top = playerRenderable.Bounds.w;
 
-            auto spriteTexcoords = entity.GetSprite().GetTexcoords();
-            float textureLeft = spriteTexcoords.x;
-            float textureBottom = spriteTexcoords.y;
-            float textureRight = spriteTexcoords.z;
-            float textureTop = spriteTexcoords.w;
+            float textureLeft = playerRenderable.Texcoords.x;
+            float textureBottom = playerRenderable.Texcoords.y;
+            float textureRight = playerRenderable.Texcoords.z;
+            float textureTop = playerRenderable.Texcoords.w;
 
             float vertices[6][4] = {{left,  top,    textureLeft,  textureTop},
                                     {left,  bottom, textureLeft,  textureBottom},
@@ -133,36 +139,47 @@ namespace gathersun::system {
             triangleCount += 2;
             vbo_.VertexAttribPointer(0, 2, GL_FLOAT, sizeof(float) * 4, 0);
             vbo_.VertexAttribPointer(1, 2, GL_FLOAT, sizeof(float) * 4, sizeof(float) * 2);
-            glDrawArrays(GL_TRIANGLES, 0, triangleCount * 3);
+            vao_.Draw(GL_TRIANGLES, 0, triangleCount * 3);
         }
 
         // UI draw pass
         defaultShader_.Bind();
         for (auto &menuEntity: menuView) {
-            auto menu = menuView.get<std::shared_ptr<ui::Menu>>(menuEntity);
-            if (menu->IsActive()) {
-                for (auto component: menu->GetComponents()) {
+            auto &menu = menuView.get<ui::Menu>(menuEntity);
+            if (menu.IsActive()) {
+                for (auto component: menu.GetElements()) {
                     auto triangleCount = 0;
-                    auto buttonComponent = registry_.get<ui::ButtonComponent>(component);
-                    // TODO: Do we want to move ButtonComponent::Position to a TransformComponent?
-                    const auto transform = entity::TransformComponent{glm::vec3(buttonComponent.Position, 0.0f), {},
-                                                              glm::vec3(1.0f)};
+                    auto &element = scene_->GetObject(component);
+                    auto &position = element.GetComponent<render::Position>();
+                    auto &renderable = element.GetComponent<render::Renderable>();
+                    const auto transform = entity::TransformComponent{glm::vec3(position.Position, 0.0f), {},
+                                                                      glm::vec3(1.0f)};
 
                     defaultShader_.UniformMat4(0, projection * transform.GetModelMatrix());
-                    uiTexture_.Bind();
+                    renderable.Texture->Bind();
                     defaultShader_.UniformTexture(1, 0);
 
-                    auto buttonTexcoords = buttonComponent.Active ? buttonComponent.ActiveTexcoords
-                                                                  : buttonComponent.InactiveTexcoords;
-                    float left = buttonComponent.PlaneBounds.x;
-                    float bottom = buttonComponent.PlaneBounds.y;
-                    float right = buttonComponent.PlaneBounds.z;
-                    float top = buttonComponent.PlaneBounds.w;
+                    auto texcoords = renderable.Texcoords;
 
-                    float textureLeft = buttonTexcoords.x / static_cast<float>(256);
-                    float textureBottom = buttonTexcoords.y / static_cast<float>(256);
-                    float textureRight = buttonTexcoords.z / static_cast<float>(256);
-                    float textureTop = buttonTexcoords.w / static_cast<float>(256);
+                    if (element.HasComponent<ui::Activatable>()) {
+                        auto &activatable = element.GetComponent<ui::Activatable>();
+                        if (activatable.Active) {
+                            texcoords = activatable.ActiveTexcoords;
+                        }
+                    }
+
+                    float left = renderable.Bounds.x;
+                    float bottom = renderable.Bounds.y;
+                    float right = renderable.Bounds.z;
+                    float top = renderable.Bounds.w;
+
+                    const auto w = renderable.Texture->GetWidth();
+                    const auto h = renderable.Texture->GetHeight();
+
+                    float textureLeft = texcoords.x / static_cast<float>(w);
+                    float textureBottom = texcoords.y / static_cast<float>(h);
+                    float textureRight = texcoords.z / static_cast<float>(w);
+                    float textureTop = texcoords.w / static_cast<float>(h);
 
                     float vertices[6][4] = {{left,  top,    textureLeft,  textureTop},
                                             {left,  bottom, textureLeft,  textureBottom},
@@ -175,7 +192,7 @@ namespace gathersun::system {
                     triangleCount += 2;
                     vbo_.VertexAttribPointer(0, 2, GL_FLOAT, sizeof(float) * 4, 0);
                     vbo_.VertexAttribPointer(1, 2, GL_FLOAT, sizeof(float) * 4, sizeof(float) * 2);
-                    glDrawArrays(GL_TRIANGLES, 0, triangleCount * 3);
+                    vao_.Draw(GL_TRIANGLES, 0, triangleCount * 3);
                 }
             }
         }
@@ -184,18 +201,23 @@ namespace gathersun::system {
         textShader_.Bind();
         vbo_.SetData(sizeof(float) * 6 * 4 * 256, nullptr);
         for (auto &menuEntity: menuView) {
-            auto menu = menuView.get<std::shared_ptr<ui::Menu>>(menuEntity);
-            if (menu->IsActive()) {
-                for (auto component: menu->GetComponents()) {
-                    auto [buttonComponent, renderableTextComponent] = registry_.get<ui::ButtonComponent, ui::RenderableTextComponent>(
-                            component);
-                    const auto &font = renderableTextComponent.Font;
-                    const auto &fontTexture = font->GetTexture();
-                    const auto transform = entity::TransformComponent{glm::vec3(buttonComponent.Position, 0.0f), {},
-                                                              glm::vec3(1.0f)};
+            auto &menu = menuView.get<ui::Menu>(menuEntity);
+            if (menu.IsActive()) {
+                for (auto component: menu.GetElements()) {
+                    auto element = scene_->GetObject(component);
+                    if (!element.HasComponent<ui::RenderableTextComponent>()) {
+                        continue;
+                    }
+                    auto &positionComponent = element.GetComponent<render::Position>();
+                    auto &renderableComponent = element.GetComponent<render::Renderable>();
+                    auto &renderableTextComponent = element.GetComponent<ui::RenderableTextComponent>();
+                    const auto font = renderableTextComponent.Font;
+                    const auto fontTexture = font->GetTexture();
+                    const auto transform = entity::TransformComponent{glm::vec3(positionComponent.Position, 0.0f), {},
+                                                                      glm::vec3(1.0f)};
 
                     textShader_.UniformMat4(0, projection * transform.GetModelMatrix());
-                    fontTexture.Bind();
+                    fontTexture->Bind();
                     textShader_.UniformTexture(1, 0);
                     textShader_.UniformVec3(2, renderableTextComponent.Color);
                     const auto &atlas = font->GetAtlas();
@@ -208,8 +230,8 @@ namespace gathersun::system {
                     // float scale = atlas.size;
                     float scale = renderableTextComponent.Scale;
 
-                    float buttonWidth = buttonComponent.PlaneBounds.z;
-                    float buttonHeight = buttonComponent.PlaneBounds.w;
+                    float buttonWidth = renderableComponent.Bounds.z;
+                    float buttonHeight = renderableComponent.Bounds.w;
 
                     glm::vec2 textDimensions = font->CalculateTextDimensions(renderableTextComponent.Text, scale);
                     x = fmax((buttonWidth - textDimensions.x) * 0.5f, 20.0f);
@@ -230,10 +252,10 @@ namespace gathersun::system {
                         float right = x + glyph.planeBounds.z * scale;
                         float top = y + glyph.planeBounds.w * scale;
 
-                        float textureLeft = glyph.atlasBounds.x / static_cast<float>(fontTexture.GetWidth());
-                        float textureBottom = glyph.atlasBounds.y / static_cast<float>(fontTexture.GetHeight());
-                        float textureRight = glyph.atlasBounds.z / static_cast<float>(fontTexture.GetWidth());
-                        float textureTop = glyph.atlasBounds.w / static_cast<float>(fontTexture.GetHeight());
+                        float textureLeft = glyph.atlasBounds.x / static_cast<float>(fontTexture->GetWidth());
+                        float textureBottom = glyph.atlasBounds.y / static_cast<float>(fontTexture->GetHeight());
+                        float textureRight = glyph.atlasBounds.z / static_cast<float>(fontTexture->GetWidth());
+                        float textureTop = glyph.atlasBounds.w / static_cast<float>(fontTexture->GetHeight());
 
                         float vertices[6][4] = {{left,  top,    textureLeft,  textureTop},
                                                 {left,  bottom, textureLeft,  textureBottom},
@@ -250,24 +272,24 @@ namespace gathersun::system {
 
                     vbo_.VertexAttribPointer(0, 2, GL_FLOAT, sizeof(float) * 4, 0);
                     vbo_.VertexAttribPointer(1, 2, GL_FLOAT, sizeof(float) * 4, sizeof(float) * 2);
-                    glDrawArrays(GL_TRIANGLES, 0, triangleCount * 3);
+                    vao_.Draw(GL_TRIANGLES, 0, triangleCount * 3);
                 }
             }
         }
 
-        endFrame_(window);
+        endFrame_();
     }
 
-    void RenderSystem::startFrame_(const std::shared_ptr<game::Window> &window) {
-        const auto size = window->GetSize();
+    void RenderSystem::startFrame_() {
+        const auto size = window_->GetSize();
         glViewport(0, 0, size.x, size.y);
 
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT);
     }
 
-    void RenderSystem::endFrame_(const std::shared_ptr<game::Window> &window) {
+    void RenderSystem::endFrame_() {
         // Swap buffers and poll events
-        window->Swap();
+        window_->Swap();
     }
 }

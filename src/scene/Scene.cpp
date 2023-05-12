@@ -3,35 +3,31 @@
 //
 
 #include "Scene.h"
+#include "entity/Object.h"
 
 namespace gathersun::scene {
 
-    void Scene::SetCamera(Camera camera) {
-        camera_ = camera;
+    entity::Object &Scene::AddObject(const std::string &name) {
+        auto entityId = registry_.create();
+        auto object = entity::Object{entityId, this};
+        objectMap_[name] = object;
+        return objectMap_[name];
     }
 
-    Camera &Scene::GetCamera() {
-        return camera_;
+    void Scene::RemoveObject(entt::entity id) {
+        registry_.destroy(id);
+        std::erase_if(objectMap_,[id](auto object) {
+            return static_cast<entt::entity>(object.second) == id;
+        });
     }
 
-    void Scene::AddEntity(entt::registry &registry, entity::Entity &entity) {
-        auto entityId = registry.create();
-        registry.emplace<entity::Entity>(entityId, entity);
-        entities_.push_back(entityId);
+    entity::Object &Scene::GetObject(const std::string &name) {
+        return objectMap_[name];
     }
 
-    void Scene::AddPlayer(entt::registry &registry, entity::Player player) {
-        registry.ctx().emplace<entity::Player>(player);
-    }
-
-    void Scene::UpdateEntity(entt::registry &registry, entt::entity entityId, entity::Entity &entity) {
-        registry.replace<entity::Entity>(entityId, entity);
-    }
-
-    // TODO: instead of keeping Sprite in the registry, just store SpriteComponent and reload the parent Sprite on-demand
-    //      (possibly an extra std::vector<Sprite> in class, change Sprite::sprite_ to an entt::entity)
-    // TODO: decouple Entity from Sprite
-    std::vector<entt::entity> Scene::GetEntities() const {
-        return entities_;
+    entity::Object &Scene::GetObject(const entt::entity id) {
+        return std::find_if(objectMap_.begin(), objectMap_.end(), [id](auto &entry) {
+            return static_cast<entt::entity>(entry.second) == id;
+        })->second;
     }
 }

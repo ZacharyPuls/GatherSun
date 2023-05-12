@@ -6,19 +6,25 @@
 #define GATHERSUN_SYSTEM_H
 
 #include "Core.h"
+#include "scene/Scene.h"
+#include "game/Window.h"
+#include "game/GameState.h"
 
 namespace gathersun::system {
 
     class System {
     public:
-        explicit System(entt::registry &registry) : registry_(registry) {}
+        System(scene::Scene *scene, game::Window *window, game::GameState *gameState) : scene_(scene), window_(window),
+                                                                                        gameState_(gameState) {}
 
         virtual ~System() = default;
 
         virtual void Run(double dt) = 0;
 
     protected:
-        entt::registry &registry_;
+        scene::Scene *scene_;
+        game::Window *window_;
+        game::GameState *gameState_;
     };
 }
 

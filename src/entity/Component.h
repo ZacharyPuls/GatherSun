@@ -7,7 +7,6 @@
 
 #include "Util.h"
 #include "Core.h"
-#include "ui/Text.h"
 
 namespace gathersun::entity {
     struct TransformComponent {

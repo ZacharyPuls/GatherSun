@@ -5,14 +5,19 @@
 #include "EventSystem.h"
 #include "ui/Menu.h"
 #include "ui/PauseMenu.h"
+#include "ui/Activatable.h"
 #include "game/GameState.h"
 #include "event/EventManager.h"
-#include "entity/Entity.h"
-#include "entity/Player.h"
+#include "entity/Object.h"
+#include "entity/Movable.h"
+#include "render/Renderable.h"
+#include "render/Animatable.h"
 
 namespace gathersun::system {
 
-    EventSystem::EventSystem(entt::registry &registry) : System(registry) {
+    EventSystem::EventSystem(scene::Scene *scene, game::Window *window, game::GameState *gameState) : System(scene,
+                                                                                                             window,
+                                                                                                             gameState) {
         event::EventManager::Instance().ConnectListener<event::ExitEvent, &EventSystem::exitEventListener_>(this);
         event::EventManager::Instance().ConnectListener<event::MouseButtonEvent, &EventSystem::mouseButtonEventListener_>(
                 this);
@@ -29,43 +34,47 @@ namespace gathersun::system {
     }
 
     void EventSystem::Run(double dt) {
-        auto &player = registry_.ctx().get<entity::Player>();
-        player.Update(dt);
+        auto &player = scene_->GetObject("Player");
+        auto &movableComponent = player.GetComponent<entity::Movable>();
+        auto &animatableComponent = player.GetComponent<render::Animatable>();
+        auto &positionComponent = player.GetComponent<render::Position>();
+        auto &renderableComponent = player.GetComponent<render::Renderable>();
+        movableComponent.Update(animatableComponent, positionComponent, renderableComponent, dt);
     }
 
     void EventSystem::exitEventListener_(event::ExitEvent) {
-        auto &state = registry_.ctx().get<game::GameState &>();
-        state = game::GameState::STOPPING;
-        // TODO: Allow for multiple windows, currently just destroying all windows
-        auto view = registry_.view<std::shared_ptr<game::Window>>();
-        registry_.destroy(view.begin(), view.end());
+        *gameState_ = game::GameState::STOPPING;
+        // TODO: Allow for multiple windows
+        window_->Destroy();
     }
 
     void EventSystem::mouseButtonEventListener_(event::MouseButtonEvent) {
-        auto window = registry_.ctx().get<std::shared_ptr<game::Window>>();
-
-        if (window->IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT) && lastClickedComponent_ == entt::null) {
-            const auto mousePosition = window->GetMousePosition();
-            auto activeMenu = getActiveMenu_(registry_);
+        if (window_->IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT) && lastClickedComponent_ == entt::null) {
+            const auto mousePosition = window_->GetMousePosition();
+            auto activeMenu = getActiveMenu_();
             if (activeMenu != entt::null) {
-                auto menu = registry_.get<std::shared_ptr<ui::Menu>>(activeMenu);
-                for (auto component: menu->GetComponents()) {
-                    auto &buttonComponent = registry_.get<ui::ButtonComponent>(component);
-                    // TODO: don't hard-code the size
-                    if (mousePosition.x >= buttonComponent.Position.x &&
-                        mousePosition.x <= (buttonComponent.Position.x + 320) &&
-                        mousePosition.y >= buttonComponent.Position.y &&
-                        mousePosition.y <= (buttonComponent.Position.y + 128)) {
-                        buttonComponent.Active = true;
+                auto &menu = scene_->GetObject(activeMenu);
+                auto &menuComponent = menu.GetComponent<ui::Menu>();
+                for (auto component: menuComponent.GetElements()) {
+                    auto &button = scene_->GetObject(component);
+                    auto &renderableComponent = button.GetComponent<render::Renderable>();
+                    auto &positionComponent = button.GetComponent<render::Position>();
+                    auto &activatableComponent = button.GetComponent<ui::Activatable>();
+                    if (mousePosition.x >= positionComponent.Position.x &&
+                        mousePosition.x <= (positionComponent.Position.x + renderableComponent.Bounds.z) &&
+                        mousePosition.y >= positionComponent.Position.y &&
+                        mousePosition.y <= (positionComponent.Position.y + renderableComponent.Bounds.w)) {
+                        activatableComponent.Active = true;
                         lastClickedComponent_ = component;
                         break;
                     }
                 }
             }
-        } else if (!window->IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT) && lastClickedComponent_ != entt::null) {
-            auto &buttonComponent = registry_.get<ui::ButtonComponent>(lastClickedComponent_);
-            buttonComponent.OnClick(registry_);
-            buttonComponent.Active = false;
+        } else if (!window_->IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT) && lastClickedComponent_ != entt::null) {
+            auto &button = scene_->GetObject(lastClickedComponent_);
+            auto &activatableComponent = button.GetComponent<ui::Activatable>();
+            activatableComponent.OnClick();
+            activatableComponent.Active = false;
             lastClickedComponent_ = entt::null;
         }
     }
@@ -76,7 +85,7 @@ namespace gathersun::system {
 
     void EventSystem::keyboardEventListener_(event::KeyboardEvent event) {
         if (event.Key == GLFW_KEY_ESCAPE && event.Type == event::KeyboardEvent::EventType::RELEASE) {
-            if (getActiveMenu_(registry_) != entt::null) {
+            if (getActiveMenu_() != entt::null) {
                 event::EventManager::Instance().TriggerEvent<event::ResumeEvent>({});
             } else {
                 event::EventManager::Instance().TriggerEvent<event::PauseEvent>({});
@@ -156,65 +165,71 @@ namespace gathersun::system {
     }
 
     void EventSystem::windowResizeEventListener_(event::Event) {
-        auto window = registry_.ctx().get<std::shared_ptr<game::Window>>();
-        auto windowSize = window->GetSize();
-        auto activeMenu = getActiveMenu_(registry_);
+        auto windowSize = window_->GetSize();
+        auto activeMenu = getActiveMenu_();
         if (activeMenu != entt::null) {
-            auto menu = registry_.get<std::shared_ptr<ui::Menu>>(activeMenu);
-            menu->Resize(windowSize, registry_);
+            auto &menu = scene_->GetObject(activeMenu);
+            // TODO: add separate resizable component type?
+            auto &menuComponent = menu.GetComponent<ui::Menu>();
+            menuComponent.Resize(windowSize);
         }
     }
 
     void EventSystem::resumeEventListener_(event::ResumeEvent) {
-        auto activeMenu = getActiveMenu_(registry_);
+/*        auto activeMenu = getActiveMenu_();
         if (activeMenu != entt::null) {
-            auto menu = registry_.get<std::shared_ptr<ui::Menu>>(activeMenu);
-            menu->SetActive(false);
-            registry_.destroy(activeMenu);
-        }
+            auto &menu = scene_->GetObject(activeMenu);
+            auto &menuComponent = menu.GetComponent<ui::PauseMenu>();
+            menuComponent.SetActive(false);
+        }*/
+
+        auto &pauseMenu = scene_->GetObject("PauseMenu");
+        auto &pauseMenuComponent = pauseMenu.GetComponent<ui::Menu>();
+        pauseMenuComponent.SetActive(false);
     }
 
     void EventSystem::pauseEventListener_(event::PauseEvent) {
-        auto window = registry_.ctx().get<std::shared_ptr<game::Window>>();
-        auto windowSize = window->GetSize();
-        auto pauseMenu = registry_.create();
-        registry_.emplace<std::shared_ptr<ui::Menu>>(pauseMenu, std::make_shared<ui::PauseMenu>(window->GetSize(),
-                                                                                                registry_))->SetActive(
-                true);
+        auto windowSize = window_->GetSize();
+        auto &pauseMenu = scene_->GetObject("PauseMenu");
+        auto &pauseMenuComponent = pauseMenu.GetComponent<ui::Menu>();
+        pauseMenuComponent.SetActive(true);
     }
 
     void EventSystem::playerMovementEventListener_(event::PlayerMovementEvent playerMovementEvent) {
         // TODO: do we want to avoid using ctx(), and just store the entt::entity ID of Player?
-        auto &player = registry_.ctx().get<entity::Player>();
+        auto &player = scene_->GetObject("Player");
+        auto &movableComponent = player.GetComponent<entity::Movable>();
 
         if (playerMovementEvent.Type == event::PlayerMovementEvent::EventType::START) {
+            auto &animatableComponent = player.GetComponent<render::Animatable>();
+
             switch (playerMovementEvent.Direction) {
                 case event::PlayerMovementEvent::Direction::FORWARD:
-                    player.StartMoving(entity::Player::Direction::FORWARD);
+                    movableComponent.StartMoving(animatableComponent, entity::Movable::Direction::FORWARD);
                     break;
                 case event::PlayerMovementEvent::Direction::LEFT:
-                    player.StartMoving(entity::Player::Direction::LEFT);
+                    movableComponent.StartMoving(animatableComponent, entity::Movable::Direction::LEFT);
                     break;
                 case event::PlayerMovementEvent::Direction::BACKWARD:
-                    player.StartMoving(entity::Player::Direction::BACKWARD);
+                    movableComponent.StartMoving(animatableComponent, entity::Movable::Direction::BACKWARD);
                     break;
                 case event::PlayerMovementEvent::Direction::RIGHT:
-                    player.StartMoving(entity::Player::Direction::RIGHT);
+                    movableComponent.StartMoving(animatableComponent, entity::Movable::Direction::RIGHT);
                     break;
             }
         } else if (playerMovementEvent.Type == event::PlayerMovementEvent::EventType::CONTINUE) {
             // TODO: do we need this event?
         } else if (playerMovementEvent.Type == event::PlayerMovementEvent::EventType::STOP) {
-            player.StopMoving();
+            movableComponent.StopMoving();
         }
     }
 
     // TODO: Handle multiple simultaneously active menus
-    entt::entity EventSystem::getActiveMenu_(entt::registry &registry) {
-        auto menuView = registry.view<std::shared_ptr<ui::Menu>>();
+    entt::entity EventSystem::getActiveMenu_() {
+        auto menuView = scene_->View<ui::Menu>();
         for (auto &menuEntity: menuView) {
-            auto menu = menuView.get<std::shared_ptr<ui::Menu>>(menuEntity);
-            if (menu->IsActive()) {
+            auto &menu = menuView.get<ui::Menu>(menuEntity);
+            if (menu.IsActive()) {
                 return menuEntity;
             }
         }

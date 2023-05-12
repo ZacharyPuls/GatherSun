@@ -47,10 +47,6 @@ namespace gathersun::render {
         height_ = height;
     }
 
-    Texture2D::~Texture2D() {
-
-    }
-
     void Texture2D::Bind() const {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, id_);

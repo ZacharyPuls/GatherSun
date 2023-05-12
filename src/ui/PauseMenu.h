@@ -2,33 +2,42 @@
 // Created by zach on 2023-04-30.
 //
 
-#ifndef GATHERSUN_PAUSEMENU_H
-#define GATHERSUN_PAUSEMENU_H
+#ifndef GATHERSUN_UI_PAUSEMENU_H
+#define GATHERSUN_UI_PAUSEMENU_H
 
 #include "Core.h"
 #include "Menu.h"
+#include "scene/Scene.h"
+#include "event/EventManager.h"
+
+#include <iostream>
 
 namespace gathersun::ui {
 
-    class PauseMenu : public Menu {
-    public:
-        explicit PauseMenu(const glm::ivec2 size, entt::registry &registry);
+    struct PauseMenu {
+        static void ResumeButtonPressed() {
+            event::EventManager::Instance().TriggerEvent<event::ResumeEvent>({});
+        }
 
-        ~PauseMenu() = default;
+        static void OptionsButtonPressed() {
 
-        void Resize(const glm::ivec2 size, entt::registry &registry) override;
+        }
 
-    private:
-        static void resumeButtonPressed_(entt::registry &registry);
+        static void LoadButtonPressed() {
+            std::cout << "Load" << std::endl;
+        }
 
-        static void optionsButtonPressed_(entt::registry &registry);
+        static void SaveButtonPressed() {
+            std::cout << "Save" << std::endl;
+        }
 
-        static void loadButtonPressed_(entt::registry &registry);
-
-        static void saveButtonPressed_(entt::registry &registry);
-
-        static void exitButtonPressed_(entt::registry &registry);
+        static void ExitButtonPressed() {
+            event::EventManager::Instance().TriggerEvent<event::ExitEvent>({});
+            std::cout << "Exit" << std::endl;
+        }
     };
-} // gathersun::ui
 
-#endif // GATHERSUN_PAUSEMENU_H
+    Menu CreatePauseMenu(scene::Scene* scene, const std::string &name, const std::string &uiElementsPath, glm::ivec2 size);
+}
+
+#endif // GATHERSUN_UI_PAUSEMENU_H

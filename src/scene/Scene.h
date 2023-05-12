@@ -7,31 +7,37 @@
 
 #include "Core.h"
 #include "Camera.h"
-#include "entity/Entity.h"
-#include "entity/Player.h"
+
+namespace gathersun::entity {
+    class Object;
+}
 
 namespace gathersun::scene {
 
     class Scene {
     public:
         Scene() = default;
+
         ~Scene() = default;
 
-        void SetCamera(Camera camera);
+        entity::Object &AddObject(const std::string &name);
 
-        Camera &GetCamera();
+        void RemoveObject(entt::entity id);
 
-        void AddEntity(entt::registry &registry, entity::Entity &entity);
+        entity::Object &GetObject(const std::string &name);
 
-        // TODO: do we really want to store player here?
-        void AddPlayer(entt::registry &registry, entity::Player player);
+        entity::Object &GetObject(entt::entity id);
 
-        void UpdateEntity(entt::registry &registry, entt::entity entityId, entity::Entity &entity);
+        template<typename... ComponentTypes>
+        auto View() {
+            return registry_.view<ComponentTypes...>();
+        }
 
-        std::vector<entt::entity> GetEntities() const;
     private:
-        Camera camera_{};
-        std::vector<entt::entity> entities_;
+        entt::registry registry_;
+        std::map<std::string, entity::Object> objectMap_;
+
+        friend class entity::Object;
     };
 }
 

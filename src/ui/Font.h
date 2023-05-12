@@ -13,20 +13,11 @@
 
 #include <string>
 #include <map>
-#include <ft2build.h>
-#include FT_FREETYPE_H
 #include <fstream>
 
 namespace gathersun::ui {
 
-    class Font {
-    public:
-        virtual ~Font() = default;
-        virtual const render::Texture& GetTexture() const = 0;
-        virtual const std::string &GetName() const = 0;
-    };
-
-    class MSDFFont : public Font {
+    class MSDFFont {
     public:
         struct Atlas {
             std::string type;
@@ -55,11 +46,11 @@ namespace gathersun::ui {
 
         explicit MSDFFont(const std::string &fontMetadataPath, const std::string &fontAtlasPath);
 
-        const render::Texture2D &GetTexture() const override;
+        std::shared_ptr<render::Texture2D> GetTexture() const;
 
         const Atlas &GetAtlas() const;
 
-        const std::string &GetName() const override;
+        const std::string &GetName() const;
 
         const Metrics &GetMetrics() const;
 
@@ -72,7 +63,7 @@ namespace gathersun::ui {
         friend void from_json(const nlohmann::json &nlohmann_json_j, MSDFFont &nlohmann_json_t);
 
     private:
-        render::Texture2D texture_;
+        std::shared_ptr<render::Texture2D> texture_;
         Atlas atlas_;
         std::string name_;
         Metrics metrics_;

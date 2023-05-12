@@ -13,6 +13,8 @@
 #include "Core.h"
 #include "system/System.h"
 #include "GameState.h"
+#include "scene/Scene.h"
+#include "render/Texture.h"
 
 namespace gathersun::game {
 
@@ -25,7 +27,6 @@ namespace gathersun::game {
 
         void Run() {
             state_ = GameState::RUNNING;
-            registry_.ctx().emplace<GameState &>(state_);
             lastFrameStartTime_ = std::chrono::steady_clock::now();
             while (state_ == GameState::RUNNING) {
                 const auto currentFrameStartTime = std::chrono::steady_clock::now();
@@ -38,11 +39,13 @@ namespace gathersun::game {
         }
 
     private:
-        entt::registry registry_;
+        std::shared_ptr<Window> window_;
         GameState state_ = GameState::STOPPED;
         std::chrono::time_point<std::chrono::steady_clock> lastFrameStartTime_;
         std::shared_ptr<system::System> renderSystem_;
         std::shared_ptr<system::EventSystem> eventSystem_;
+        std::shared_ptr<scene::Scene> scene_;
+        std::shared_ptr<render::Texture2D> uiTexture_;
     };
 }
 

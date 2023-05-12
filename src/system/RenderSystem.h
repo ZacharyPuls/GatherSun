@@ -6,18 +6,20 @@
 #define GATHERSUN_SYSTEM_RENDERSYSTEM_H
 
 #include "Core.h"
-#include "ui/Font.h"
 #include "System.h"
 #include "game/Window.h"
 #include "scene/Scene.h"
 #include "event/Event.h"
 #include "render/Shader.h"
+#include "render/VertexArray.h"
+#include "render/VertexBuffer.h"
+#include "render/Texture.h"
 
 namespace gathersun::system {
 
     class RenderSystem : public System {
     public:
-        explicit RenderSystem(entt::registry &registry);
+        RenderSystem(scene::Scene *scene, game::Window *window, game::GameState *gameState);
 
         void Run(double dt) override;
 
@@ -27,12 +29,10 @@ namespace gathersun::system {
         render::VertexBuffer vbo_;
         render::Shader defaultShader_;
         render::Shader textShader_;
-        render::Texture2D uiTexture_;
-        scene::Scene scene_;
 
-        void startFrame_(const std::shared_ptr<game::Window> &window);
+        void startFrame_();
 
-        void endFrame_(const std::shared_ptr<game::Window> &window);
+        void endFrame_();
     };
 }
 

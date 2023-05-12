@@ -6,6 +6,8 @@
 #define GATHERSUN_UI_MENU_H
 
 #include "Core.h"
+#include "scene/Scene.h"
+#include "render/Texture.h"
 
 namespace gathersun::ui {
 
@@ -32,41 +34,41 @@ namespace gathersun::ui {
         };
 
         struct ObjectType {
-            struct PlaneBounds {
-                float left;
-                float bottom;
-                float right;
-                float top;
-
-                NLOHMANN_DEFINE_TYPE_INTRUSIVE(PlaneBounds, left, bottom, right, top);
-            };
-
-            struct AtlasBounds {
-                float left;
-                float bottom;
-                float right;
-                float top;
-
-                NLOHMANN_DEFINE_TYPE_INTRUSIVE(AtlasBounds, left, bottom, right, top);
-            };
-
             std::string Name;
-            PlaneBounds PlaneBounds;
-            AtlasBounds Inactive;
-            AtlasBounds Active;
+            glm::vec4 PlaneBounds;
+            glm::vec4 Inactive;
+            glm::vec4 Active;
 
             friend void to_json(nlohmann::json &nlohmann_json_j, const ObjectType &nlohmann_json_t) {
                 nlohmann_json_j["name"] = nlohmann_json_t.Name;
-                nlohmann_json_j["planeBounds"] = nlohmann_json_t.PlaneBounds;
-                nlohmann_json_j["atlasBounds"]["inactive"] = nlohmann_json_t.Inactive;
-                nlohmann_json_j["atlasBounds"]["active"] = nlohmann_json_t.Active;
+                nlohmann_json_j["planeBounds"]["left"] = nlohmann_json_t.PlaneBounds.x;
+                nlohmann_json_j["planeBounds"]["bottom"] = nlohmann_json_t.PlaneBounds.y;
+                nlohmann_json_j["planeBounds"]["right"] = nlohmann_json_t.PlaneBounds.z;
+                nlohmann_json_j["planeBounds"]["top"] = nlohmann_json_t.PlaneBounds.w;
+                nlohmann_json_j["atlasBounds"]["inactive"]["left"] = nlohmann_json_t.Inactive.x;
+                nlohmann_json_j["atlasBounds"]["inactive"]["bottom"] = nlohmann_json_t.Inactive.y;
+                nlohmann_json_j["atlasBounds"]["inactive"]["right"] = nlohmann_json_t.Inactive.z;
+                nlohmann_json_j["atlasBounds"]["inactive"]["top"] = nlohmann_json_t.Inactive.w;
+                nlohmann_json_j["atlasBounds"]["active"]["left"] = nlohmann_json_t.Active.x;
+                nlohmann_json_j["atlasBounds"]["active"]["bottom"] = nlohmann_json_t.Active.y;
+                nlohmann_json_j["atlasBounds"]["active"]["right"] = nlohmann_json_t.Active.z;
+                nlohmann_json_j["atlasBounds"]["active"]["top"] = nlohmann_json_t.Active.w;
             }
 
             friend void from_json(const nlohmann::json &nlohmann_json_j, ObjectType &nlohmann_json_t) {
                 nlohmann_json_j.at("name").get_to(nlohmann_json_t.Name);
-                nlohmann_json_j.at("planeBounds").get_to(nlohmann_json_t.PlaneBounds);
-                nlohmann_json_j.at("atlasBounds").at("inactive").get_to(nlohmann_json_t.Inactive);
-                nlohmann_json_j.at("atlasBounds").at("active").get_to(nlohmann_json_t.Active);
+                nlohmann_json_j.at("planeBounds").at("left").get_to(nlohmann_json_t.PlaneBounds.x);
+                nlohmann_json_j.at("planeBounds").at("bottom").get_to(nlohmann_json_t.PlaneBounds.y);
+                nlohmann_json_j.at("planeBounds").at("right").get_to(nlohmann_json_t.PlaneBounds.z);
+                nlohmann_json_j.at("planeBounds").at("top").get_to(nlohmann_json_t.PlaneBounds.w);
+                nlohmann_json_j.at("atlasBounds").at("inactive").at("left").get_to(nlohmann_json_t.Inactive.x);
+                nlohmann_json_j.at("atlasBounds").at("inactive").at("bottom").get_to(nlohmann_json_t.Inactive.y);
+                nlohmann_json_j.at("atlasBounds").at("inactive").at("right").get_to(nlohmann_json_t.Inactive.z);
+                nlohmann_json_j.at("atlasBounds").at("inactive").at("top").get_to(nlohmann_json_t.Inactive.w);
+                nlohmann_json_j.at("atlasBounds").at("active").at("left").get_to(nlohmann_json_t.Active.x);
+                nlohmann_json_j.at("atlasBounds").at("active").at("bottom").get_to(nlohmann_json_t.Active.y);
+                nlohmann_json_j.at("atlasBounds").at("active").at("right").get_to(nlohmann_json_t.Active.z);
+                nlohmann_json_j.at("atlasBounds").at("active").at("top").get_to(nlohmann_json_t.Active.w);
             }
         };
 
@@ -88,21 +90,11 @@ namespace gathersun::ui {
         }
     };
 
-    struct ButtonComponent {
-        glm::ivec2 Position;
-        glm::ivec2 Size;
-        glm::vec4 PlaneBounds;
-        glm::vec4 InactiveTexcoords;
-        glm::vec4 ActiveTexcoords;
-        std::function<void(entt::registry&)> OnClick;
-        bool Active = false;
-    };
-
     class Menu {
     public:
         Menu() = default;
 
-        Menu(std::string name, const std::string &uiElementsPath);
+        Menu(scene::Scene *scene, std::string name, const std::string &uiElementsPath);
 
         ~Menu() = default;
 
@@ -118,21 +110,25 @@ namespace gathersun::ui {
 
         void SetName(const std::string &name);
 
-        const std::vector<entt::entity> &GetComponents() const;
+        const std::vector<entt::entity> &GetElements() const;
 
-        void AddButton(entt::registry &registry, glm::ivec2 position, glm::ivec2 size,
-                       std::function<void(entt::registry &)> onClick, const std::string &text);
+        void
+        AddButton(glm::ivec2 position, glm::ivec2 size, std::function<void(void)> onClick, const std::string &text);
 
-        virtual void Resize(const glm::ivec2 size, entt::registry &registry) = 0;
+        void AddListBox(glm::ivec2 position, glm::ivec2 size, std::function<void(const std::string &)> onSelect,
+                        const std::vector<std::string> &values);
+
+        void Resize(glm::ivec2 size);
 
     protected:
         UIElements uiElements_;
-
+        scene::Scene *scene_;
+        std::shared_ptr<render::Texture2D> uiTexture_;
     private:
         bool active_ = false;
         std::string font_ = "Pixel Art";
         std::string name_;
-        std::vector<entt::entity> components_;
+        std::vector<entt::entity> elements_;
     };
 }
 

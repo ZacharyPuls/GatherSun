@@ -12,14 +12,7 @@
 
 namespace gathersun::render {
 
-    class Texture {
-    public:
-        virtual ~Texture() = default;
-
-        virtual void Bind() const = 0;
-    };
-
-    class Texture2D : public Texture {
+    class Texture2D {
     public:
         Texture2D() = default;
 
@@ -28,9 +21,9 @@ namespace gathersun::render {
         explicit Texture2D(GLsizei width, GLsizei height, GLint internalFormat, GLenum format, GLenum type,
                            const void *data);
 
-        ~Texture2D() override;
+        ~Texture2D() = default;
 
-        void Bind() const override;
+        void Bind() const;
 
         void Update(GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type,
                     const void *data);
@@ -41,7 +34,7 @@ namespace gathersun::render {
 
         GLsizei GetHeight() const;
 
-        const std::string& GetFilename() const;
+        const std::string &GetFilename() const;
 
     private:
         GLuint id_ = 0;

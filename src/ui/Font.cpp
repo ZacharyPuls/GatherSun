@@ -81,10 +81,10 @@ namespace gathersun::ui {
                        std::inserter(glyphs_, glyphs_.end()),
                        [](const MSDFFont::Glyph &glyph) { return std::pair<uint8_t, Glyph>(glyph.unicode, glyph); });
 
-        texture_ = render::Texture2D(fontAtlasPath, true);
+        texture_ = std::make_shared<render::Texture2D>(fontAtlasPath, true);
     }
 
-    const render::Texture2D &MSDFFont::GetTexture() const {
+    std::shared_ptr<render::Texture2D> MSDFFont::GetTexture() const {
         return texture_;
     }
 
@@ -105,7 +105,7 @@ namespace gathersun::ui {
     }
 
     void to_json(nlohmann::json &nlohmann_json_j, const MSDFFont &font) {
-        nlohmann_json_j["texture_"] = font.texture_.GetFilename();
+        nlohmann_json_j["texture_"] = font.texture_->GetFilename();
         nlohmann_json_j["atlas_"] = font.atlas_;
         nlohmann_json_j["metrics_"] = font.metrics_;
         nlohmann_json_j["glyphs_"] = font.glyphs_;
@@ -114,7 +114,7 @@ namespace gathersun::ui {
     void from_json(const nlohmann::json &nlohmann_json_j, MSDFFont &font) {
         std::string filename;
         nlohmann_json_j.at("texture_").get_to(filename);
-        font.texture_ = render::Texture2D(filename, true);
+        font.texture_ = std::make_shared<render::Texture2D>(filename, true);
         nlohmann_json_j.at("atlas_").get_to(font.atlas_);
         nlohmann_json_j.at("metrics_").get_to(font.metrics_);
         nlohmann_json_j.at("glyphs_").get_to(font.glyphs_);

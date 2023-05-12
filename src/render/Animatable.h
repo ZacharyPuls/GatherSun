@@ -63,8 +63,28 @@ namespace gathersun::render {
         uint8_t CurrentCycle = 0;
         uint8_t NumCycles = 1;
         float SecondsPerKeyFrame = 1.0f;
+        double SubKeyFrame = 0.0f;
         std::vector<KeyFrame> KeyFrames;
         std::map<uint8_t, Cycle> Cycles;
+
+        void SetCycle(const std::string &cycle) {
+            uint8_t cycleIndex = std::find_if(Cycles.begin(), Cycles.end(), [cycle](const auto entry) {
+                return entry.second.Name == cycle;
+            })->second.Index;
+            CurrentKeyFrame = Cycles[cycleIndex].StartingKeyFrame;
+            CurrentCycle = cycleIndex;
+        }
+
+        void AdvanceKeyFrame(double dt) {
+            SubKeyFrame += dt;
+            if (SubKeyFrame >= SecondsPerKeyFrame) {
+                SubKeyFrame -= SecondsPerKeyFrame;
+                const auto currentCycle = Cycles[CurrentCycle];
+                if (++CurrentKeyFrame >= currentCycle.StartingKeyFrame + currentCycle.NumKeyFrames) {
+                    CurrentKeyFrame = currentCycle.StartingKeyFrame;
+                }
+            }
+        }
 
         friend void to_json(nlohmann::json &nlohmann_json_j, const Animatable &nlohmann_json_t) {
             nlohmann_json_j["numKeyFrames"] = nlohmann_json_t.NumKeyFrames;

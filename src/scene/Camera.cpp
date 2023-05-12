@@ -3,7 +3,7 @@
 //
 
 #include "Camera.h"
-#include "entity/Entity.h"
+#include "entity/Object.h"
 
 namespace gathersun::scene {
 
